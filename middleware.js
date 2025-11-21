@@ -1,17 +1,17 @@
 import arcjet, { createMiddleware, detectBot, shield } from "@arcjet/next";
-import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import { createServerClient } from '@supabase/ssr';
 import { NextResponse } from "next/server";
 
-const isProtectedRoute = createRouteMatcher([
-  "/dashboard(.*)",
-  "/account(.*)",
-  "/transaction(.*)",
-]);
+const protectedRoutes = [
+  "/dashboard",
+  "/account",
+  "/transaction",
+];
 
 // Create Arcjet middleware
 const aj = arcjet({
   key: process.env.ARCJET_KEY,
-  // characteristics: ["userId"], // Track based on Clerk userId
+  // characteristics: ["userId"], // Track based on Supabase userId
   rules: [
     // Shield protection for content and security
     shield({
@@ -28,20 +28,76 @@ const aj = arcjet({
   ],
 });
 
-// Create base Clerk middleware
-const clerk = clerkMiddleware(async (auth, req) => {
-  const { userId } = await auth();
+// Supabase auth middleware
+async function supabaseMiddleware(req) {
+  let response = NextResponse.next({
+    request: {
+      headers: req.headers,
+    },
+  });
 
-  if (!userId && isProtectedRoute(req)) {
-    const { redirectToSignIn } = await auth();
-    return redirectToSignIn();
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    {
+      cookies: {
+        get(name) {
+          return req.cookies.get(name)?.value;
+        },
+        set(name, value, options) {
+          req.cookies.set({
+            name,
+            value,
+            ...options,
+          });
+          response = NextResponse.next({
+            request: {
+              headers: req.headers,
+            },
+          });
+          response.cookies.set({
+            name,
+            value,
+            ...options,
+          });
+        },
+        remove(name, options) {
+          req.cookies.set({
+            name,
+            value: '',
+            ...options,
+          });
+          response = NextResponse.next({
+            request: {
+              headers: req.headers,
+            },
+          });
+          response.cookies.set({
+            name,
+            value: '',
+            ...options,
+          });
+        },
+      },
+    }
+  );
+
+  const { data: { user } } = await supabase.auth.getUser();
+
+  // Check if the route is protected
+  const isProtectedRoute = protectedRoutes.some(route =>
+    req.nextUrl.pathname.startsWith(route)
+  );
+
+  if (isProtectedRoute && !user) {
+    return NextResponse.redirect(new URL('/sign-in', req.url));
   }
 
-  return NextResponse.next();
-});
+  return response;
+}
 
-// Chain middlewares - ArcJet runs first, then Clerk
-export default createMiddleware(aj, clerk);
+// Chain middlewares - ArcJet runs first, then Supabase auth
+export default createMiddleware(aj, supabaseMiddleware);
 
 export const config = {
   matcher: [

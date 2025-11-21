@@ -1,7 +1,7 @@
 "use server";
 
 import { db } from "@/lib/prisma";
-import { auth } from "@clerk/nextjs/server";
+import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
 const serializeDecimal = (obj) => {
@@ -16,19 +16,20 @@ const serializeDecimal = (obj) => {
 };
 
 export async function getAccountWithTransactions(accountId) {
-  const { userId } = await auth();
-  if (!userId) throw new Error("Unauthorized");
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Unauthorized");
 
-  const user = await db.user.findUnique({
-    where: { clerkUserId: userId },
+  const dbUser = await db.user.findUnique({
+    where: { id: user.id },
   });
 
-  if (!user) throw new Error("User not found");
+  if (!dbUser) throw new Error("User not found");
 
   const account = await db.account.findUnique({
     where: {
       id: accountId,
-      userId: user.id,
+      userId: dbUser.id,
     },
     include: {
       transactions: {
@@ -50,20 +51,21 @@ export async function getAccountWithTransactions(accountId) {
 
 export async function bulkDeleteTransactions(transactionIds) {
   try {
-    const { userId } = await auth();
-    if (!userId) throw new Error("Unauthorized");
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Unauthorized");
 
-    const user = await db.user.findUnique({
-      where: { clerkUserId: userId },
+    const dbUser = await db.user.findUnique({
+      where: { id: user.id },
     });
 
-    if (!user) throw new Error("User not found");
+    if (!dbUser) throw new Error("User not found");
 
     // Get transactions to calculate balance changes
     const transactions = await db.transaction.findMany({
       where: {
         id: { in: transactionIds },
-        userId: user.id,
+        userId: dbUser.id,
       },
     });
 
@@ -83,7 +85,7 @@ export async function bulkDeleteTransactions(transactionIds) {
       await tx.transaction.deleteMany({
         where: {
           id: { in: transactionIds },
-          userId: user.id,
+          userId: dbUser.id,
         },
       });
 
@@ -113,21 +115,22 @@ export async function bulkDeleteTransactions(transactionIds) {
 
 export async function updateDefaultAccount(accountId) {
   try {
-    const { userId } = await auth();
-    if (!userId) throw new Error("Unauthorized");
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Unauthorized");
 
-    const user = await db.user.findUnique({
-      where: { clerkUserId: userId },
+    const dbUser = await db.user.findUnique({
+      where: { id: user.id },
     });
 
-    if (!user) {
+    if (!dbUser) {
       throw new Error("User not found");
     }
 
     // First, unset any existing default account
     await db.account.updateMany({
       where: {
-        userId: user.id,
+        userId: dbUser.id,
         isDefault: true,
       },
       data: { isDefault: false },
@@ -137,13 +140,13 @@ export async function updateDefaultAccount(accountId) {
     const account = await db.account.update({
       where: {
         id: accountId,
-        userId: user.id,
+        userId: dbUser.id,
       },
       data: { isDefault: true },
     });
 
     revalidatePath("/dashboard");
-    return { success: true, data: serializeTransaction(account) };
+    return { success: true, data: serializeDecimal(account) };
   } catch (error) {
     return { success: false, error: error.message };
   }

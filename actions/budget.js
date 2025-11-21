@@ -1,25 +1,26 @@
 "use server";
 
 import { db } from "@/lib/prisma";
-import { auth } from "@clerk/nextjs/server";
+import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
 export async function getCurrentBudget(accountId) {
   try {
-    const { userId } = await auth();
-    if (!userId) throw new Error("Unauthorized");
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Unauthorized");
 
-    const user = await db.user.findUnique({
-      where: { clerkUserId: userId },
+    const dbUser = await db.user.findUnique({
+      where: { id: user.id },
     });
 
-    if (!user) {
+    if (!dbUser) {
       throw new Error("User not found");
     }
 
     const budget = await db.budget.findFirst({
       where: {
-        userId: user.id,
+        userId: dbUser.id,
       },
     });
 
@@ -38,7 +39,7 @@ export async function getCurrentBudget(accountId) {
 
     const expenses = await db.transaction.aggregate({
       where: {
-        userId: user.id,
+        userId: dbUser.id,
         type: "EXPENSE",
         date: {
           gte: startOfMonth,
@@ -65,25 +66,26 @@ export async function getCurrentBudget(accountId) {
 
 export async function updateBudget(amount) {
   try {
-    const { userId } = await auth();
-    if (!userId) throw new Error("Unauthorized");
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Unauthorized");
 
-    const user = await db.user.findUnique({
-      where: { clerkUserId: userId },
+    const dbUser = await db.user.findUnique({
+      where: { id: user.id },
     });
 
-    if (!user) throw new Error("User not found");
+    if (!dbUser) throw new Error("User not found");
 
     // Update or create budget
     const budget = await db.budget.upsert({
       where: {
-        userId: user.id,
+        userId: dbUser.id,
       },
       update: {
         amount,
       },
       create: {
-        userId: user.id,
+        userId: dbUser.id,
         amount,
       },
     });

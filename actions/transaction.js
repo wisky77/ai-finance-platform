@@ -1,6 +1,6 @@
 "use server";
 
-import { auth } from "@clerk/nextjs/server";
+import { createClient } from "@/lib/supabase/server";
 import { db } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { GoogleGenerativeAI } from "@google/generative-ai";
@@ -17,15 +17,16 @@ const serializeAmount = (obj) => ({
 // Create Transaction
 export async function createTransaction(data) {
   try {
-    const { userId } = await auth();
-    if (!userId) throw new Error("Unauthorized");
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Unauthorized");
 
     // Get request data for ArcJet
     const req = await request();
 
     // Check rate limit
     const decision = await aj.protect(req, {
-      userId,
+      userId: user.id,
       requested: 1, // Specify how many tokens to consume
     });
 
@@ -46,8 +47,8 @@ export async function createTransaction(data) {
       throw new Error("Request blocked");
     }
 
-    const user = await db.user.findUnique({
-      where: { clerkUserId: userId },
+    const dbUser = await db.user.findUnique({
+      where: { id: user.id },
     });
 
     if (!user) {
@@ -57,7 +58,7 @@ export async function createTransaction(data) {
     const account = await db.account.findUnique({
       where: {
         id: data.accountId,
-        userId: user.id,
+        userId: dbUser.id,
       },
     });
 
@@ -100,11 +101,12 @@ export async function createTransaction(data) {
 }
 
 export async function getTransaction(id) {
-  const { userId } = await auth();
-  if (!userId) throw new Error("Unauthorized");
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Unauthorized");
 
-  const user = await db.user.findUnique({
-    where: { clerkUserId: userId },
+  const dbUser = await db.user.findUnique({
+    where: { id: user.id },
   });
 
   if (!user) throw new Error("User not found");
@@ -112,7 +114,7 @@ export async function getTransaction(id) {
   const transaction = await db.transaction.findUnique({
     where: {
       id,
-      userId: user.id,
+      userId: dbUser.id,
     },
   });
 
@@ -123,11 +125,12 @@ export async function getTransaction(id) {
 
 export async function updateTransaction(id, data) {
   try {
-    const { userId } = await auth();
-    if (!userId) throw new Error("Unauthorized");
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Unauthorized");
 
-    const user = await db.user.findUnique({
-      where: { clerkUserId: userId },
+    const dbUser = await db.user.findUnique({
+      where: { id: user.id },
     });
 
     if (!user) throw new Error("User not found");
@@ -136,7 +139,7 @@ export async function updateTransaction(id, data) {
     const originalTransaction = await db.transaction.findUnique({
       where: {
         id,
-        userId: user.id,
+        userId: dbUser.id,
       },
       include: {
         account: true,
@@ -161,7 +164,7 @@ export async function updateTransaction(id, data) {
       const updated = await tx.transaction.update({
         where: {
           id,
-          userId: user.id,
+          userId: dbUser.id,
         },
         data: {
           ...data,
@@ -197,11 +200,12 @@ export async function updateTransaction(id, data) {
 // Get User Transactions
 export async function getUserTransactions(query = {}) {
   try {
-    const { userId } = await auth();
-    if (!userId) throw new Error("Unauthorized");
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Unauthorized");
 
-    const user = await db.user.findUnique({
-      where: { clerkUserId: userId },
+    const dbUser = await db.user.findUnique({
+      where: { id: user.id },
     });
 
     if (!user) {
@@ -210,7 +214,7 @@ export async function getUserTransactions(query = {}) {
 
     const transactions = await db.transaction.findMany({
       where: {
-        userId: user.id,
+        userId: dbUser.id,
         ...query,
       },
       include: {
