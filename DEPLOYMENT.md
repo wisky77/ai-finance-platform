@@ -22,12 +22,48 @@ Notes
 - Local .env files are ignored in Vercel; copy values into Vercel env settings.
 - You can pull production envs locally via: `vercel env pull .env.local` (optional).
 
-## 2) Configure build and migrations
+## 2) Configure build (no DB access in build)
 - Build Command (recommended):
-  - `npm run build && npx prisma migrate deploy`
+  - `npm run build`
 - Output: leave default (Next.js)
 
-Rationale: `prisma migrate deploy` ensures your production DB schema matches the Prisma migrations before the app runs.
+Rationale: Avoid any database connections during Vercel’s build phase. Prisma and your DB should not be contacted during `next build`.
+
+## 2b) Run migrations outside of Vercel build
+Choose one of the following approaches:
+
+- Manual, ad-hoc (one-time or as needed):
+  1) Pull production envs locally: `vercel env pull .env.production`
+  2) Run: `npx prisma migrate deploy --schema=./prisma/schema.prisma`
+
+- CI/CD (recommended):
+  - Use a GitHub Actions workflow that runs on push to main and executes `prisma migrate deploy` using your production DATABASE_URL/DIRECT_URL secrets. Example:
+    ```yaml
+    name: Deploy migrations
+    on:
+      workflow_dispatch: {}
+      push:
+        branches: [ main ]
+        paths:
+          - prisma/**
+    jobs:
+      migrate:
+        runs-on: ubuntu-latest
+        steps:
+          - uses: actions/checkout@v4
+          - uses: actions/setup-node@v4
+            with:
+              node-version: 20
+          - run: npm ci
+          - run: npx prisma migrate deploy --schema=./prisma/schema.prisma
+            env:
+              DATABASE_URL: ${{ secrets.DATABASE_URL }}
+              DIRECT_URL: ${{ secrets.DIRECT_URL }}
+    ```
+
+Notes:
+- Keep `npm run migrate:deploy` available for manual runs; just don’t call it in the Vercel build step.
+- Seeding should also not run during build. Use the `/api/seed` route (dev only) or a dedicated script triggered manually/CI if needed.
 
 ## 3) Deploy
 - Connect the Vercel project to the repository (main branch).

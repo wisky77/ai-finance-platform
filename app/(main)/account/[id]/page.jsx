@@ -6,6 +6,8 @@ import { AccountChart } from "../_components/account-chart";
 import { AIInsightBox } from "../_components/ai-insight-box";
 import { TransactionTableWithPdf } from "../_components/TransactionsWithPdf";
 
+export const dynamic = "force-dynamic";
+
 export default async function AccountPage({ params }) {
   const { id } = await params;
   const accountData = await getAccountWithTransactions(id);

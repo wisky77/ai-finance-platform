@@ -9,6 +9,8 @@ import { Plus } from "lucide-react";
 import { DashboardOverview } from "./_components/transaction-overview";
 import { AIInsightBox } from "../account/_components/ai-insight-box";
 
+export const dynamic = "force-dynamic";
+
 export default async function DashboardPage() {
   const [accounts, transactions] = await Promise.all([
     getUserAccounts(),
