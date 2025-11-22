@@ -26,7 +26,7 @@ export function TransactionTableWithPdf({ transactions }) {
               <tr key={txn.id} className="border-b">
                 <td className="py-2 px-4">{new Date(txn.date).toLocaleDateString()}</td>
                 <td className="py-2 px-4">{txn.type}</td>
-                <td className="py-2 px-4">${txn.amount.toFixed(2)}</td>
+                <td className="py-2 px-4">Kes ${txn.amount.toFixed(2)}</td>
                 <td className="py-2 px-4">{txn.category}</td>
                 <td className="py-2 px-4">{txn.status}</td>
               </tr>
