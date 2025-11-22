@@ -25,8 +25,17 @@ export function AIInsightBox({ transactions }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ transactions }),
       });
-      const data = await res.json();
+      if (!res.ok) {
+        // Try to parse error body for a message
+        let errMsg = `Request failed (${res.status})`;
+        try {
+          const e = await res.json();
+          if (e?.message) errMsg = e.message;
+        } catch {}
+        throw new Error(errMsg);
+      }
 
+      const data = await res.json();
       if (data.status === 'success') {
         setInsight(data.insight || 'No insight generated.');
       } else {
