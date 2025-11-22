@@ -1,24 +1,35 @@
 import { NextResponse } from "next/server";
 
-// Keep this list minimal to avoid regex bloat in matcher
+// Keep these lists minimal to avoid regex bloat in matcher
 const protectedRoutes = ["/dashboard", "/account", "/transaction"];
+const authRoutes = ["/sign-in", "/sign-up"];
 
 // Very small, cookie-only guard to avoid heavy bundles in Edge
 export default function middleware(req) {
   const { nextUrl, cookies } = req;
+  const pathname = nextUrl.pathname;
 
-  // Fast path: skip if not a protected route
-  const isProtected = protectedRoutes.some((route) => nextUrl.pathname.startsWith(route));
-  if (!isProtected) return NextResponse.next();
+  // Supabase sets cookies when authenticated. Check common names.
+  const hasAccessToken = Boolean(
+    cookies.get("sb-access-token")?.value ||
+    cookies.get("sb:token")?.value ||
+    cookies.get("sb-refresh-token")?.value
+  );
 
-  // Supabase sets sb-access-token when the user is authenticated
-  // (naming may vary by setup; this is the common default)
-  const hasAccessToken = Boolean(cookies.get("sb-access-token")?.value);
+  const isProtected = protectedRoutes.some((route) => pathname.startsWith(route));
+  const isAuthRoute = authRoutes.some((route) => pathname.startsWith(route));
 
-  if (!hasAccessToken) {
+  // If already authenticated and on an auth route, redirect to dashboard (or requested redirect)
+  if (isAuthRoute && hasAccessToken) {
+    const redirectParam = nextUrl.searchParams.get("redirect");
+    const dest = redirectParam || "/dashboard";
+    return NextResponse.redirect(new URL(dest, req.url));
+  }
+
+  // Gate protected routes if not authenticated
+  if (isProtected && !hasAccessToken) {
     const signInUrl = new URL("/sign-in", req.url);
-    // Optionally preserve return path
-    signInUrl.searchParams.set("redirect", nextUrl.pathname + nextUrl.search);
+    signInUrl.searchParams.set("redirect", pathname + nextUrl.search);
     return NextResponse.redirect(signInUrl);
   }
 
@@ -29,7 +40,7 @@ export const config = {
   matcher: [
     // Skip Next.js internals and static assets
     "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
-    // Always run for API routes only if you want to gate them by cookie, otherwise remove this line
+    // If you want to also guard API routes by cookie, uncomment:
     // "/(api|trpc)(.*)",
   ],
 };
