@@ -1,7 +1,8 @@
 import { GoogleGenAI } from '@google/genai';
-const GEMINI_API_KEY = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+// Client no longer accesses API keys directly. Use server API instead.
 
-const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+// Fetch insights from server API instead of client SDK
+// Example: await fetch('/api/generate-insight', { method: 'POST', body: JSON.stringify({ ... }) })
 
 export async function GenerativeAI(transactions) {
     const response = await ai.models.generateContent({

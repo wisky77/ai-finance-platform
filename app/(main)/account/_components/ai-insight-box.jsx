@@ -3,14 +3,12 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { GoogleGenAI } from '@google/genai';
+// AI moved server-side via /api/generate-insight
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
 
 
-const GEMINI_API_KEY = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
-const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
 
 export function AIInsightBox({ transactions }) {
   const [insight, setInsight] = useState("");
@@ -21,23 +19,19 @@ export function AIInsightBox({ transactions }) {
     setInsight(""); // Reset previous insight
 
     try {
-      // Generate content using GoogleGenAI
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.0-flash-001',
-        contents: `Based on these transactions: ${JSON.stringify(transactions)}, give a summary of how I am spending the funds. Also predict my spending for the next month based on these transactions. Also give recommendations on what I need to reduce.
-        
-      Use this structure:
-      1. Summary of spending
-      2. Prediction for next month
-      3. Recommendations for reducing spending  
-
-      If it is hard to predict, say so. If there are no transactions, say so.
-      If there are no recommendations, say so. If there are no predictions, say so. If there is no summary, say so. If there is no spending, say so. If there is no spending pattern, say so. If there is no spending trend, say so. If there is no spending history, say so. If there is no spending data, say so. If there is no spending information, say so. If there is no spending analysis, say so. If there is no spending report, say so.
-        `,
+      // Call server API to generate insight securely
+      const res = await fetch('/api/generate-insight', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ transactions }),
       });
+      const data = await res.json();
 
-      // Set the insight result
-      setInsight(response.text || "No insight generated.");
+      if (data.status === 'success') {
+        setInsight(data.insight || 'No insight generated.');
+      } else {
+        throw new Error(data.message || 'Failed to generate insight');
+      }
     } catch (err) {
       console.error(err);
       setInsight("Something went wrong while generating insight.");

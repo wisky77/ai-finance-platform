@@ -7,7 +7,8 @@ import { AIInsightBox } from "../_components/ai-insight-box";
 import { TransactionTableWithPdf } from "../_components/TransactionsWithPdf";
 
 export default async function AccountPage({ params }) {
-  const accountData = await getAccountWithTransactions(params.id);
+  const { id } = await params;
+  const accountData = await getAccountWithTransactions(id);
 
   if (!accountData) {
     notFound();
