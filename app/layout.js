@@ -10,6 +10,8 @@ export const metadata = {
   description: "One stop Finance Platform",
 };
 
+export const dynamic = "force-dynamic";
+
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
