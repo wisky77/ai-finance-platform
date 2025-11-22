@@ -1,14 +1,12 @@
 import React from "react";
 import { Button } from "./ui/button";
-import { PenBox, LayoutDashboard, LogOut } from "lucide-react";
+import { PenBox, LayoutDashboard } from "lucide-react";
 import Link from "next/link";
 import { checkUser } from "@/lib/checkUser";
 import { createClient } from "@/lib/supabase/server";
-import Image from "next/image";
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
